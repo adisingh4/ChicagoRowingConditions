@@ -675,15 +675,18 @@ function uvLabel(uv) {
 }
 
 /* ============ SCORING ============ */
-function sWind(mph) {
+function sWind(mph, gust) {
   if (mph == null) return 5;
-  if (mph <= 3)  return 10;
-  if (mph <= 6)  return 9;
-  if (mph <= 9)  return 7.5;
-  if (mph <= 12) return 6;
-  if (mph <= 15) return 4;
-  if (mph <= 18) return 2.5;
-  if (mph <= 22) return 1.5;
+  // Gusts catch the blade and hull, so blend them into an "effective" wind.
+  const eff = (gust != null && gust > mph) ? mph * 0.65 + gust * 0.35 : mph;
+  if (eff <= 2)  return 10;   // glassy
+  if (eff <= 4)  return 9;
+  if (eff <= 6)  return 8;
+  if (eff <= 8)  return 6.5;
+  if (eff <= 10) return 5;
+  if (eff <= 12) return 3.5;
+  if (eff <= 15) return 2.5;
+  if (eff <= 18) return 1.5;
   return 1;
 }
 function sTemp(f) {
@@ -745,7 +748,7 @@ function safetyGate(h) {
 function rowingScore(h) {
   const w = { wind: 0.40, weather: 0.27, temp: 0.20, precip: 0.13 };
   const subs = {
-    wind:    sWind(h.wind),
+    wind:    sWind(h.wind, h.windGust),
     weather: sWeather(h.weatherCode, h.cloud),
     temp:    sTemp(h.temp),
     precip:  sPrecip(h.precipProb),

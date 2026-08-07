@@ -729,19 +729,19 @@ function safetyGate(h) {
   const gust = Math.max(h.wind ?? 0, h.windGust ?? 0);
   // Thunderstorm — lightning on open water is an automatic no-go
   if (h.weatherCode != null && h.weatherCode >= 95) {
-    cap = Math.min(cap, 2); alerts.push('⛈️ Thunderstorm — lightning risk');
+    cap = Math.min(cap, 2); alerts.push('Thunderstorm — lightning risk');
   }
   // Cold: freezing = ice + cold-shock danger; near-freezing = hypothermia risk
   if (h.temp != null && h.temp <= 32) {
-    cap = Math.min(cap, 2); alerts.push('🧊 Freezing — ice & cold-water danger');
+    cap = Math.min(cap, 2); alerts.push('Freezing — ice & cold-water danger');
   } else if (h.temp != null && h.temp <= 40) {
-    cap = Math.min(cap, 5); alerts.push('❄️ Cold water — dress for immersion');
+    cap = Math.min(cap, 5); alerts.push('Cold water — dress for immersion');
   }
   // Wind: ~18 mph brings whitecaps on the river; 23+ is genuinely hazardous
   if (gust >= 23) {
-    cap = Math.min(cap, 2); alerts.push('💨 Dangerous wind — stay in');
+    cap = Math.min(cap, 2); alerts.push('Dangerous wind — stay in');
   } else if (gust >= 18) {
-    cap = Math.min(cap, 4); alerts.push('💨 High wind / whitecaps');
+    cap = Math.min(cap, 4); alerts.push('High wind / whitecaps');
   }
   return { cap, alerts };
 }

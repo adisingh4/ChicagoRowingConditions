@@ -493,7 +493,7 @@
 
   <p class="footer">
     Weather: <a class="source" href="https://open-meteo.com" target="_blank">Open-Meteo</a><br/>
-    Score = wind 40% · weather/sun 27% · temp 20% · precip 13%
+    Score = wind 40% · weather/sun 27% · temp 20% · precip 13% · safety caps for storms, freezing & high wind
   </p>
 </div>
 
@@ -730,6 +730,30 @@ function sPrecip(prob) {
   if (prob < 75) return 3.5;
   return 1.5;
 }
+/* Hard safety gates: a single dangerous factor should veto a good average,
+   so these cap the final score regardless of how pleasant everything else is. */
+function safetyGate(h) {
+  const alerts = [];
+  let cap = 10;
+  const gust = Math.max(h.wind ?? 0, h.windGust ?? 0);
+  // Thunderstorm — lightning on open water is an automatic no-go
+  if (h.weatherCode != null && h.weatherCode >= 95) {
+    cap = Math.min(cap, 2); alerts.push('⛈️ Thunderstorm — lightning risk');
+  }
+  // Cold: freezing = ice + cold-shock danger; near-freezing = hypothermia risk
+  if (h.temp != null && h.temp <= 32) {
+    cap = Math.min(cap, 2); alerts.push('🧊 Freezing — ice & cold-water danger');
+  } else if (h.temp != null && h.temp <= 40) {
+    cap = Math.min(cap, 5); alerts.push('❄️ Cold water — dress for immersion');
+  }
+  // Wind: ~18 mph brings whitecaps on the river; 23+ is genuinely hazardous
+  if (gust >= 23) {
+    cap = Math.min(cap, 2); alerts.push('💨 Dangerous wind — stay in');
+  } else if (gust >= 18) {
+    cap = Math.min(cap, 4); alerts.push('💨 High wind / whitecaps');
+  }
+  return { cap, alerts };
+}
 function rowingScore(h) {
   const w = { wind: 0.40, weather: 0.27, temp: 0.20, precip: 0.13 };
   const subs = {
@@ -740,7 +764,10 @@ function rowingScore(h) {
   };
   let total = 0;
   for (const k in w) total += subs[k] * w[k];
-  return { score: Math.max(1, Math.min(10, Math.round(total))), subs };
+  let score = Math.max(1, Math.min(10, Math.round(total)));
+  const gate = safetyGate(h);
+  score = Math.min(score, gate.cap);
+  return { score, subs, alerts: gate.alerts };
 }
 function scoreColor(s) {
   if (s >= 8) return '#4dd99a';
@@ -876,11 +903,19 @@ function render(data) {
   document.getElementById('scoreNow').style.webkitBackgroundClip = 'text';
   document.getElementById('verdict').textContent = verdictFor(nowScore);
 
+  const curScored = rowingScore(cur);
   const reasons = [];
-  if (cur.wind != null) reasons.push(`${Math.round(cur.wind)} mph wind`);
+  if (cur.wind != null) {
+    const dir = (cur.windDir != null) ? ` from ${dirCardinal(cur.windDir)}` : '';
+    reasons.push(`${Math.round(cur.wind)} mph wind${dir}`);
+  }
   if (cur.temp != null) reasons.push(`${Math.round(cur.temp)}°F`);
   reasons.push(wxText(cur.weatherCode)[0].toLowerCase());
-  document.getElementById('whyNow').textContent = reasons.join(' · ');
+  // Lead with any safety alerts so they can't be missed
+  const whyText = (curScored.alerts && curScored.alerts.length)
+    ? curScored.alerts.join(' · ') + '  ·  ' + reasons.join(' · ')
+    : reasons.join(' · ');
+  document.getElementById('whyNow').textContent = whyText;
 
   // Best/worst — only consider future (NOW_INDEX onward)
   let bestI = NOW_INDEX, worstI = NOW_INDEX;
@@ -983,7 +1018,8 @@ function render(data) {
   // ===== Wind =====
   document.getElementById('windNow').textContent = (cur.wind != null) ? Math.round(cur.wind) : '—';
   document.getElementById('windGust').textContent = `Gusts ${Math.round(cur.windGust ?? cur.wind ?? 0)} mph`;
-  document.getElementById('windDir').textContent = (cur.windDir != null) ? dirCardinal(cur.windDir) : '—';
+  document.getElementById('windDir').textContent = (cur.windDir != null)
+    ? `${dirCardinal(cur.windDir)} · from ${Math.round(cur.windDir)}°` : '—';
   document.getElementById('windNeedle').style.transform =
     `translate(-50%, -100%) rotate(${(cur.windDir ?? 0)}deg)`;
   {
